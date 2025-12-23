@@ -1,1 +1,22 @@
 project_id = "icnnqilmwytviqxbybzn"
+
+[functions.scan-website]
+verify_jwt = false
+
+[functions.scan-api]
+verify_jwt = false
+
+[functions.analyze-qr]
+verify_jwt = false
+
+[functions.monitor-control]
+verify_jwt = false
+
+[functions.block-entity]
+verify_jwt = false
+
+[functions.live-threat-stream]
+verify_jwt = false
+
+[functions.multi-agent-analysis]
+verify_jwt = false
