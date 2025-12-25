@@ -1,73 +1,81 @@
-# Welcome to your Lovable project
+# Threat Predict
 
-## Project info
+Threat Predict is a comprehensive security monitoring and scanning platform built with modern web technologies. It provides real-time threat detection, AI-powered predictions, and various security scanning tools to ensure the integrity and safety of your digital assets.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## 🚀 Key Features
 
-## How can I edit this code?
+### 🛡️ Real-time Monitoring
+- **Live Threat Map**: Interactive visualization of global security threats using Three.js.
+- **Analytics Dashboard**: Comprehensive view of security metrics and attack patterns.
+- **Threat Feed**: Real-time stream of security incidents and blocked attacks.
+- **Globe View**: 3D globe visualization for geographic threat analysis.
 
-There are several ways of editing your application.
+### 🔍 Advanced Scanners
+- **Website Scanner**: Comprehensive vulnerability assessment for web applications.
+- **API Scanner**: Security auditing for RESTful endpoints.
+- **QR Scanner**: Secure QR code analysis and verification.
+- **Static Scanner**: File-based security analysis.
 
-**Use Lovable**
+### 🤖 AI-Powered Insights
+- **Threat Predictions**: Machine learning-driven analysis to anticipate potential security breaches.
+- **Incident Management**: Automated tracking and resolution workflow for security alerts.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### 👥 Management & Security
+- **User Management**: Role-based access control and user activity tracking.
+- **Secure Authentication**: Robust auth system powered by Supabase.
+- **Customizable Settings**: Fine-tune scanning parameters and monitoring preferences.
 
-Changes made via Lovable will be committed automatically to this repo.
+## 🛠️ Tech Stack
 
-**Use your preferred IDE**
+- **Frontend**: [React](https://reactjs.org/) + [TypeScript](https://www.typescriptlang.org/) + [Vite](https://vitejs.dev/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/)
+- **Visualization**: [Three.js](https://threejs.org/) (@react-three/fiber) + [Recharts](https://recharts.org/)
+- **Backend/Database**: [Supabase](https://supabase.com/)
+- **State Management**: [TanStack Query](https://tanstack.com/query/latest)
+- **Forms & Validation**: [React Hook Form](https://react-hook-form.com/) + [Zod](https://zod.dev/)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## 🏁 Getting Started
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Prerequisites
+- Node.js (v18 or higher)
+- npm or bun
 
-Follow these steps:
+### Installation
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd threat-predict
+   ```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+2. **Install dependencies**
+   ```bash
+   npm install
+   # or
+   bun install
+   ```
 
-# Step 3: Install the necessary dependencies.
-npm i
+3. **Environment Setup**
+   Create a `.env` file in the root directory and add your Supabase credentials:
+   ```env
+   VITE_SUPABASE_URL=your_supabase_url
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+4. **Run Development Server**
+   ```bash
+   npm run dev
+   ```
+   The application will be available at `http://localhost:8080`.
 
-**Edit a file directly in GitHub**
+## 🏗️ Project Structure
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- `src/pages`: Main application views (Dashboard, Scanners, Monitors, etc.)
+- `src/components`: Reusable UI components built with shadcn/ui.
+- `src/hooks`: Custom React hooks for logic reuse.
+- `src/integrations`: Supabase and other third-party integrations.
+- `supabase/`: Database migrations and edge functions.
 
-**Use GitHub Codespaces**
+## 📄 License
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+This project is licensed under the MIT License.
