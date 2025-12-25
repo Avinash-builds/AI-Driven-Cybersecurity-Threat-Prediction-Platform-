@@ -43,6 +43,19 @@ export function useSecurityStats() {
   const [threatTrends, setThreatTrends] = useState<ThreatTrend[]>([]);
   const [attackTypes, setAttackTypes] = useState<AttackType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [autoBlockEnabled, setAutoBlockEnabled] = useState(() => {
+    const saved = localStorage.getItem('autoBlockEnabled');
+    return saved ? JSON.parse(saved) : false;
+  });
+
+  const toggleAutoBlock = useCallback(() => {
+    setAutoBlockEnabled((prev: boolean) => {
+      const newValue = !prev;
+      localStorage.setItem('autoBlockEnabled', JSON.stringify(newValue));
+      toast.success(newValue ? 'Auto-block enabled' : 'Auto-block disabled');
+      return newValue;
+    });
+  }, []);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -129,6 +142,74 @@ export function useSecurityStats() {
     }
   };
 
+  const blockAllAttacks = async (attacks: Array<{ id: string; source_ip: string; attack_type: string; severity: string }>) => {
+    let blocked = 0;
+    let failed = 0;
+    
+    for (const attack of attacks) {
+      try {
+        const { error } = await supabase.functions.invoke('block-entity', {
+          body: { 
+            type: 'ip', 
+            value: attack.source_ip, 
+            attack_id: attack.id, 
+            attack_type: attack.attack_type, 
+            severity: attack.severity, 
+            reason: 'Bulk block from dashboard',
+            auto_blocked: false
+          }
+        });
+        if (!error) {
+          blocked++;
+        } else {
+          failed++;
+        }
+      } catch {
+        failed++;
+      }
+    }
+    
+    await fetchStats();
+    return { success: failed === 0, blocked, failed };
+  };
+
+  // Auto-block incoming critical/high severity attacks
+  useEffect(() => {
+    if (!autoBlockEnabled) return;
+    
+    const channel = supabase.channel('auto-block-realtime')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'live_attacks',
+        filter: 'severity=in.(critical,high)'
+      }, async (payload) => {
+        const attack = payload.new as any;
+        if (attack.severity === 'critical' || attack.severity === 'high') {
+          console.log(`Auto-blocking ${attack.severity} attack from ${attack.source_ip}`);
+          try {
+            await supabase.functions.invoke('block-entity', {
+              body: { 
+                type: 'ip', 
+                value: attack.source_ip, 
+                attack_id: attack.id, 
+                attack_type: attack.attack_type, 
+                severity: attack.severity, 
+                reason: `Auto-blocked ${attack.severity} threat`,
+                auto_blocked: true
+              }
+            });
+            toast.info(`Auto-blocked ${attack.severity} attack from ${attack.source_ip}`);
+          } catch (error) {
+            console.error('Auto-block failed:', error);
+          }
+        }
+      })
+      .subscribe();
+      
+    return () => { supabase.removeChannel(channel); };
+  }, [autoBlockEnabled]);
+
   useEffect(() => {
     fetchStats();
     const channel = supabase.channel('stats-realtime')
@@ -139,5 +220,5 @@ export function useSecurityStats() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchStats]);
 
-  return { stats, threatTrends, attackTypes, isLoading, refresh: fetchStats, blockAttack };
+  return { stats, threatTrends, attackTypes, isLoading, refresh: fetchStats, blockAttack, autoBlockEnabled, toggleAutoBlock, blockAllAttacks };
 }

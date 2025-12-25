@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Shield, AlertTriangle, Activity, Target, Zap, RefreshCw } from 'lucide-react';
+import { Shield, AlertTriangle, Activity, Target, Zap, RefreshCw, ShieldBan, ShieldCheck, Loader2 } from 'lucide-react';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { RiskGauge } from '@/components/dashboard/RiskGauge';
 import { ThreatFeed } from '@/components/dashboard/ThreatFeed';
 import { ThreatChart } from '@/components/dashboard/ThreatChart';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { ExportButton } from '@/components/ExportButton';
 import { useNavigate } from 'react-router-dom';
 import { useLiveThreatData } from '@/hooks/useLiveThreatData';
 import { useSecurityStats } from '@/hooks/useSecurityStats';
+import { toast } from 'sonner';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -18,8 +20,9 @@ export default function Dashboard() {
     limit: 20
   });
 
-  const { stats, isLoading: statsLoading, refresh: refreshStats, blockAttack } = useSecurityStats();
+  const { stats, isLoading: statsLoading, refresh: refreshStats, blockAttack, autoBlockEnabled, toggleAutoBlock, blockAllAttacks } = useSecurityStats();
   const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [isBlockingAll, setIsBlockingAll] = useState(false);
 
   const isLoading = attacksLoading || statsLoading;
 
@@ -91,6 +94,27 @@ export default function Dashboard() {
     await Promise.all([refreshAttacks(), refreshStats()]);
   };
 
+  const handleBlockAllAttacks = async () => {
+    if (attacks.length === 0) {
+      toast.info('No active attacks to block');
+      return;
+    }
+    setIsBlockingAll(true);
+    try {
+      const result = await blockAllAttacks(attacks);
+      if (result.success) {
+        toast.success(`Blocked ${result.blocked} attacks successfully`);
+        await handleRefresh();
+      } else {
+        toast.error(`Failed to block some attacks: ${result.failed} failed`);
+      }
+    } catch (error: any) {
+      toast.error(`Block all failed: ${error.message}`);
+    } finally {
+      setIsBlockingAll(false);
+    }
+  };
+
   const exportData = {
     stats,
     liveAttacks: attacks,
@@ -118,7 +142,32 @@ export default function Dashboard() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Auto Block Toggle */}
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/30 border border-border">
+            <ShieldCheck className={`h-4 w-4 ${autoBlockEnabled ? 'text-success' : 'text-muted-foreground'}`} />
+            <span className="text-sm font-medium">Auto Block</span>
+            <Switch
+              checked={autoBlockEnabled}
+              onCheckedChange={toggleAutoBlock}
+            />
+          </div>
+          
+          {/* Block All Attacks Button */}
+          <Button 
+            variant="destructive" 
+            onClick={handleBlockAllAttacks} 
+            disabled={isBlockingAll || attacks.length === 0}
+            className="gap-2"
+          >
+            {isBlockingAll ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ShieldBan className="h-4 w-4" />
+            )}
+            Block All Attacks ({attacks.length})
+          </Button>
+          
           <Button variant="outline" size="icon" onClick={handleRefresh} disabled={isLoading}>
             <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
           </Button>
