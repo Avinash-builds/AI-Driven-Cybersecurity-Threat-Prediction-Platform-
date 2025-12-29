@@ -15,7 +15,7 @@ import {
 import {
   Shield, LayoutDashboard, FileSearch, Globe, Zap, QrCode, FileCode,
   Map, Globe2, BarChart3, Database, ShieldOff, Brain, AlertTriangle,
-  Settings, Users, LogOut, Menu, X, ChevronDown
+  Settings, Users, LogOut, Menu, X, ChevronDown, Cloud
 } from 'lucide-react';
 
 const navigation = [
@@ -49,6 +49,7 @@ const navigation = [
     ],
   },
   { name: 'Incidents', href: '/incidents', icon: AlertTriangle },
+  { name: 'Export History', href: '/exports', icon: Cloud },
   { name: 'Users', href: '/users', icon: Users },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
