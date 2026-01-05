@@ -9,6 +9,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useState, Suspense } from 'react';
 import { useLiveThreatData } from '@/hooks/useLiveThreatData';
 import { Globe3D } from '@/components/Globe3D';
+import { AttackGlobe } from '@/components/AttackGlobe';
 
 // Simple SVG World Map component
 const WorldMap = ({ attacks }: { attacks: any[] }) => {
@@ -258,11 +259,20 @@ export default function LiveMap() {
               <span className="ml-2 text-sm text-muted-foreground">Loading 3D Globe...</span>
             </div>
           }>
-            <Globe3D attacks={filteredAttacks} />
+            <AttackGlobe attacks={filteredAttacks} stats={stats} />
           </Suspense>
         );
       case 'satellite':
-        return <SatelliteMap attacks={filteredAttacks} />;
+        return (
+          <Suspense fallback={
+            <div className="absolute inset-0 flex items-center justify-center bg-background/80">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-2 text-sm text-muted-foreground">Loading Satellite View...</span>
+            </div>
+          }>
+            <Globe3D attacks={filteredAttacks} />
+          </Suspense>
+        );
       default:
         return <WorldMap attacks={filteredAttacks} />;
     }
