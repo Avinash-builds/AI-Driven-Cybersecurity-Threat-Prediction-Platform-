@@ -97,8 +97,13 @@ export default function Incidents() {
     }
 
     const { error } = await supabase.from('incidents').insert({
-      ...newIncident,
-      status: 'open'
+      title: newIncident.title,
+      description: newIncident.description || null,
+      severity: newIncident.severity,
+      attack_type: newIncident.attack_type || null,
+      source_ip: newIncident.source_ip || null,
+      status: 'open',
+      created_by: user?.id
     });
 
     if (error) {
