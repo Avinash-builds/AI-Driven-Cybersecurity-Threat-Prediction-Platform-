@@ -1,14 +1,12 @@
-import { useRef, useState, useEffect, Suspense } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Sphere } from '@react-three/drei';
-import * as THREE from 'three';
-import { Play, Pause, RotateCcw, RefreshCw, Loader2 } from 'lucide-react';
+import { useState, useEffect, Suspense } from 'react';
+import { Play, Pause, RefreshCw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { AttackGlobe } from '@/components/AttackGlobe';
 
 interface LiveAttack {
   id: string;
@@ -28,78 +26,6 @@ interface ThreatStreamData {
   summary: string;
 }
 
-function latLngToVector3(lat: number, lng: number, radius: number) {
-  const phi = (90 - lat) * (Math.PI / 180);
-  const theta = (lng + 180) * (Math.PI / 180);
-  const x = -(radius * Math.sin(phi) * Math.cos(theta));
-  const z = radius * Math.sin(phi) * Math.sin(theta);
-  const y = radius * Math.cos(phi);
-  return new THREE.Vector3(x, y, z);
-}
-
-function AttackArc({ source, target, severity }: { source: { lat: number; lng: number }; target: { lat: number; lng: number }; severity: string; }) {
-  const color = severity === 'critical' ? '#ef4444' : severity === 'high' ? '#f97316' : severity === 'medium' ? '#eab308' : '#22c55e';
-  const points: THREE.Vector3[] = [];
-  const sourceVec = latLngToVector3(source.lat, source.lng, 2);
-  const targetVec = latLngToVector3(target.lat, target.lng, 2);
-  
-  for (let i = 0; i <= 50; i++) {
-    const t = i / 50;
-    const point = new THREE.Vector3().lerpVectors(sourceVec, targetVec, t);
-    const height = Math.sin(t * Math.PI) * 0.5;
-    point.normalize().multiplyScalar(2 + height);
-    points.push(point);
-  }
-
-  const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
-
-  return (
-    <group>
-      <primitive object={new THREE.Line(lineGeometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.6 }))} />
-      <mesh position={sourceVec}>
-        <sphereGeometry args={[0.03, 8, 8]} />
-        <meshBasicMaterial color={color} />
-      </mesh>
-      <mesh position={targetVec}>
-        <sphereGeometry args={[0.02, 8, 8]} />
-        <meshBasicMaterial color="#00d4ff" />
-      </mesh>
-    </group>
-  );
-}
-
-function Globe({ attacks, isRotating }: { attacks: LiveAttack[]; isRotating: boolean }) {
-  const globeRef = useRef<THREE.Group>(null);
-
-  useFrame(() => {
-    if (globeRef.current && isRotating) {
-      globeRef.current.rotation.y += 0.001;
-    }
-  });
-
-  return (
-    <group ref={globeRef}>
-      <Sphere args={[2, 64, 64]}>
-        <meshStandardMaterial color="#1a1f35" wireframe transparent opacity={0.3} />
-      </Sphere>
-      <Sphere args={[1.98, 64, 64]}>
-        <meshStandardMaterial color="#0d1117" />
-      </Sphere>
-      <Sphere args={[2.01, 32, 32]}>
-        <meshBasicMaterial color="#00d4ff" wireframe transparent opacity={0.05} />
-      </Sphere>
-      {attacks.slice(0, 15).map((attack) => (
-        <AttackArc
-          key={attack.id}
-          source={{ lat: attack.source.lat, lng: attack.source.lng }}
-          target={{ lat: attack.target.lat, lng: attack.target.lng }}
-          severity={attack.severity}
-        />
-      ))}
-    </group>
-  );
-}
-
 function GlobeLoader() {
   return (
     <div className="h-full w-full flex items-center justify-center">
@@ -114,7 +40,6 @@ function GlobeLoader() {
 export default function GlobeView() {
   const [attacks, setAttacks] = useState<LiveAttack[]>([]);
   const [threatData, setThreatData] = useState<ThreatStreamData | null>(null);
-  const [isRotating, setIsRotating] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -160,6 +85,24 @@ export default function GlobeView() {
     }
   };
 
+  // Transform attacks for AttackGlobe component
+  const globeAttacks = attacks.map(attack => ({
+    id: attack.id,
+    source_lat: attack.source.lat,
+    source_lng: attack.source.lng,
+    target_lat: attack.target.lat,
+    target_lng: attack.target.lng,
+    severity: attack.severity,
+    attack_type: attack.type,
+    source_ip: attack.source.ip,
+    source_country: attack.source.country
+  }));
+
+  const stats = {
+    total: attacks.length,
+    attacksPerMinute: Math.floor(Math.random() * 20) + 30
+  };
+
   const topAttackers = threatData?.geographicDistribution?.slice(0, 5) || [];
   const threatActors = threatData?.threatActors?.slice(0, 5) || [];
 
@@ -179,41 +122,18 @@ export default function GlobeView() {
             {isPaused ? <Play className="h-4 w-4 mr-2" /> : <Pause className="h-4 w-4 mr-2" />}
             {isPaused ? 'Resume' : 'Pause'}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setIsRotating(!isRotating)}>
-            <RotateCcw className={cn('h-4 w-4 mr-2', isRotating && 'animate-spin-slow')} />
-            {isRotating ? 'Stop Rotation' : 'Auto Rotate'}
-          </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3 cyber-card rounded-xl border border-border h-[600px] overflow-hidden relative">
           <Suspense fallback={<GlobeLoader />}>
-            <Canvas camera={{ position: [0, 0, 6], fov: 45 }}>
-              <ambientLight intensity={0.3} />
-              <pointLight position={[10, 10, 10]} intensity={0.8} />
-              <pointLight position={[-10, -10, -10]} intensity={0.3} color="#00d4ff" />
-              <Globe attacks={attacks} isRotating={isRotating} />
-              <OrbitControls enableZoom={true} enablePan={false} minDistance={4} maxDistance={10} autoRotate={false} />
-            </Canvas>
+            <AttackGlobe attacks={globeAttacks} stats={stats} />
           </Suspense>
-
-          <div className="absolute top-4 left-4 bg-card/90 backdrop-blur-sm rounded-lg p-3 border border-border">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="h-2 w-2 rounded-full bg-success animate-pulse" />
-              <span className="text-xs font-medium">Live AI Monitor</span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Global Threat: <span className={cn("font-bold uppercase", 
-                threatData?.globalThreatLevel === 'critical' ? 'text-destructive' :
-                threatData?.globalThreatLevel === 'high' ? 'text-warning' : 'text-success'
-              )}>{threatData?.globalThreatLevel || 'Loading...'}</span>
-            </p>
-          </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="cyber-card rounded-xl border border-border p-4">
+        <div className="space-y-4 max-h-[600px] flex flex-col">
+          <div className="cyber-card rounded-xl border border-border p-4 flex-shrink-0">
             <h3 className="font-semibold mb-3">Top Attack Sources</h3>
             <div className="space-y-2">
               {topAttackers.length > 0 ? topAttackers.map((attacker: any, i: number) => (
@@ -235,19 +155,19 @@ export default function GlobeView() {
             </div>
           </div>
 
-          <div className="cyber-card rounded-xl border border-border p-4">
+          <div className="cyber-card rounded-xl border border-border p-4 flex-shrink-0">
             <h3 className="font-semibold mb-3">Active Threat Actors</h3>
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-32 overflow-y-auto">
               {threatActors.length > 0 ? threatActors.map((actor: any, i: number) => (
                 <div key={i} className="p-2 rounded-lg bg-muted/30">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{actor.name}</span>
-                    <Badge variant="outline" className={cn("text-xs",
+                    <span className="text-sm font-medium truncate">{actor.name}</span>
+                    <Badge variant="outline" className={cn("text-xs flex-shrink-0",
                       actor.activityLevel === 'high' ? 'border-destructive text-destructive' :
                       actor.activityLevel === 'medium' ? 'border-warning text-warning' : 'border-success text-success'
                     )}>{actor.activityLevel}</Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">{actor.type}</p>
+                  <p className="text-xs text-muted-foreground mt-1 truncate">{actor.type}</p>
                 </div>
               )) : (
                 <p className="text-xs text-muted-foreground">Loading actor data...</p>
@@ -255,8 +175,8 @@ export default function GlobeView() {
             </div>
           </div>
 
-          <div className="cyber-card rounded-xl border border-border flex flex-col h-[250px]">
-            <div className="p-3 border-b border-border">
+          <div className="cyber-card rounded-xl border border-border flex flex-col flex-1 min-h-0">
+            <div className="p-3 border-b border-border flex-shrink-0">
               <h3 className="font-semibold text-sm">Live Feed</h3>
             </div>
             <ScrollArea className="flex-1">
@@ -269,7 +189,7 @@ export default function GlobeView() {
                       </Badge>
                       <span className="font-medium truncate">{attack.type}</span>
                     </div>
-                    <p className="text-muted-foreground">
+                    <p className="text-muted-foreground truncate">
                       {attack.source.country} → {attack.target.country}
                     </p>
                   </div>
