@@ -184,7 +184,7 @@ const SatelliteMap = ({ attacks }: { attacks: any[] }) => {
 
 export default function LiveMap() {
   const [filter, setFilter] = useState('all');
-  const [viewMode, setViewMode] = useState<'flat' | '3d' | 'satellite'>('flat');
+  const [viewMode, setViewMode] = useState<'flat' | '3d' | 'satellite'>('3d');
   const { 
     attacks, 
     threatData, 
