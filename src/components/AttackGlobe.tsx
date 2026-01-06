@@ -161,8 +161,8 @@ export function AttackGlobe({ attacks, stats }: AttackGlobeProps) {
       </AnimatePresence>
 
       {/* Overlays */}
-      <div className="absolute top-4 left-4 md:top-6 md:left-6 z-20 space-y-3 pointer-events-none md:pointer-events-auto w-[calc(100%-2rem)] md:w-auto overflow-y-auto max-h-[calc(100%-2rem)] scrollbar-hide pb-20 md:pb-0">
-        <div className="backdrop-blur-md bg-black/40 p-4 rounded-2xl border-l-4 border-primary w-full md:w-56 pointer-events-auto shadow-lg">
+      <div className="absolute top-4 left-4 md:top-6 md:left-6 z-20 space-y-3 pointer-events-none md:pointer-events-auto w-auto max-w-[calc(100%-5rem)] md:max-w-none">
+        <div className="backdrop-blur-md bg-black/40 p-4 rounded-2xl border-l-4 border-primary w-56 pointer-events-auto shadow-lg">
           <div className="text-xs text-primary font-mono mb-1 tracking-widest uppercase">Global Attack Rate</div>
           <div className="text-xl md:text-2xl font-bold text-white font-mono">
             {displayStats.rate} <span className="text-[10px] md:text-xs font-normal text-gray-500 uppercase tracking-tighter">Attacks/Sec</span>
@@ -177,17 +177,17 @@ export function AttackGlobe({ attacks, stats }: AttackGlobeProps) {
           </div>
         </div>
 
-        <div className={`backdrop-blur-md bg-black/40 p-3 rounded-2xl w-full md:w-56 space-y-2 pointer-events-auto ${activeTab === 'intel' ? 'block' : 'hidden md:block'}`}>
+        <div className={`backdrop-blur-md bg-black/40 p-3 rounded-2xl w-56 space-y-2 pointer-events-auto ${activeTab === 'intel' ? 'block' : 'hidden md:block'}`}>
           <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
             <Crosshair size={12} className="text-destructive" />
             Live Vectors
           </h3>
-          <div className="space-y-1.5 max-h-36 overflow-y-auto scrollbar-hide">
-            {arcsData.slice().reverse().slice(0, 8).map((a, i) => (
+          <div className="space-y-1.5 max-h-28 overflow-y-auto scrollbar-hide">
+            {arcsData.slice().reverse().slice(0, 5).map((a, i) => (
               <div key={i} className="flex items-center justify-between text-[10px] font-mono p-2 bg-black/40 border border-white/5 rounded">
-                <span className="text-destructive">{a.ip}</span>
+                <span className="text-destructive truncate max-w-[80px]">{a.ip}</span>
                 <span className="text-white opacity-50">→</span>
-                <span className="text-primary">{a.type}</span>
+                <span className="text-primary truncate max-w-[60px]">{a.type}</span>
               </div>
             ))}
           </div>
