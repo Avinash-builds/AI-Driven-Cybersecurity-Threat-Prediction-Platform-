@@ -279,13 +279,13 @@ export default function LiveMap() {
   };
 
   return (
-    <div className="space-y-6 h-full">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold">Live Attack Map</h1>
           <p className="text-muted-foreground">Real-time AI-powered global cyber attack monitoring</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {/* View Mode Selector */}
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="mr-2">
             <TabsList className="h-9">
@@ -319,7 +319,7 @@ export default function LiveMap() {
       </div>
 
       {/* Stats Bar */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="cyber-card rounded-lg border border-border p-4 flex items-center gap-4">
           <div className="p-2 rounded-lg bg-primary/10">
             <Activity className="h-5 w-5 text-primary" />
@@ -358,18 +358,31 @@ export default function LiveMap() {
         </div>
       </div>
 
+      {/* AI Threat Summary - Moved above main content */}
+      {threatData?.summary && (
+        <div className="cyber-card rounded-xl border border-primary/30 bg-primary/5 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Shield className="h-5 w-5 text-primary" />
+            <h3 className="font-semibold">AI Threat Summary</h3>
+          </div>
+          <p className="text-sm text-muted-foreground">{threatData.summary}</p>
+        </div>
+      )}
+
       {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[500px]">
-        <div className="lg:col-span-2 cyber-card rounded-xl border border-border overflow-hidden relative">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Globe - takes 3 columns */}
+        <div className="lg:col-span-3 cyber-card rounded-xl border border-border overflow-hidden relative h-[500px]">
           {renderMapView()}
         </div>
 
-        <div className="cyber-card rounded-xl border border-border flex flex-col">
-          <div className="p-4 border-b border-border flex items-center justify-between">
+        {/* Live Attack Feed - fixed height, takes 1 column */}
+        <div className="cyber-card rounded-xl border border-border flex flex-col h-[500px]">
+          <div className="p-4 border-b border-border flex items-center justify-between flex-shrink-0">
             <h3 className="font-semibold">Live Attack Feed</h3>
             <Select value={filter} onValueChange={setFilter}>
-              <SelectTrigger className="w-32 h-8">
-                <Filter className="h-3 w-3 mr-2" />
+              <SelectTrigger className="w-24 h-8">
+                <Filter className="h-3 w-3 mr-1" />
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -381,9 +394,9 @@ export default function LiveMap() {
               </SelectContent>
             </Select>
           </div>
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 min-h-0">
             <div className="p-2 space-y-2">
-              {filteredAttacks.slice(0, 20).map((attack) => (
+              {filteredAttacks.slice(0, 15).map((attack) => (
                 <div
                   key={attack.id}
                   className={cn(
@@ -392,20 +405,20 @@ export default function LiveMap() {
                   )}
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <Badge className={getSeverityColor(attack.severity)}>
+                    <Badge className={cn("text-xs px-1.5 py-0", getSeverityColor(attack.severity))}>
                       {attack.severity}
                     </Badge>
-                    <span className="text-sm font-medium">{attack.type}</span>
-                    <span className="text-xs text-muted-foreground ml-auto">{attack.confidence}%</span>
+                    <span className="text-sm font-medium truncate flex-1">{attack.type}</span>
+                    <span className="text-xs text-muted-foreground flex-shrink-0">{attack.confidence}%</span>
                   </div>
                   <div className="text-xs text-muted-foreground space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span>From: {attack.source_country}</span>
-                      <code className="font-mono bg-muted/50 px-1 rounded">{attack.source_ip}</code>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate">From: {attack.source_country}</span>
+                      <code className="font-mono bg-muted/50 px-1 rounded text-[10px] flex-shrink-0">{attack.source_ip}</code>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span>To: {attack.target_country}</span>
-                      <span>{formatDistanceToNow(new Date(attack.timestamp), { addSuffix: true })}</span>
+                      <span className="truncate">To: {attack.target_country}</span>
+                      <span className="flex-shrink-0">{formatDistanceToNow(new Date(attack.timestamp), { addSuffix: true })}</span>
                     </div>
                   </div>
                 </div>
@@ -414,14 +427,6 @@ export default function LiveMap() {
           </ScrollArea>
         </div>
       </div>
-
-      {/* Threat Summary */}
-      {threatData?.summary && (
-        <div className="cyber-card rounded-xl border border-border p-4">
-          <h3 className="font-semibold mb-2">AI Threat Summary</h3>
-          <p className="text-sm text-muted-foreground">{threatData.summary}</p>
-        </div>
-      )}
     </div>
   );
 }
