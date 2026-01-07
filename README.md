@@ -67,7 +67,9 @@ Threat Predict is a comprehensive security monitoring and scanning platform buil
    npm run dev
    ```
    The application will be available at `http://localhost:8080`.
-
+5. **Default Admin credentials**
+   Username: Avinash@tp.com
+   Pass : 12345678
 ## 🏗️ Project Structure
 
 - `src/pages`: Main application views (Dashboard, Scanners, Monitors, etc.)
