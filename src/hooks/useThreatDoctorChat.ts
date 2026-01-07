@@ -1,5 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 export interface Message {
   id: string;
@@ -8,12 +10,141 @@ export interface Message {
   timestamp: Date;
 }
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/threat-doctor-chat`;
+export interface Conversation {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+const CHAT_URL = `https://icnnqilmwytviqxbybzn.supabase.co/functions/v1/threat-doctor-chat`;
 
 export function useThreatDoctorChat() {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(true);
   const { toast } = useToast();
+  const { user } = useAuth();
+
+  // Load conversations on mount
+  useEffect(() => {
+    if (user) {
+      loadConversations();
+    } else {
+      setConversations([]);
+      setCurrentConversationId(null);
+      setMessages([]);
+      setIsLoadingConversations(false);
+    }
+  }, [user]);
+
+  const loadConversations = async () => {
+    if (!user) return;
+    
+    setIsLoadingConversations(true);
+    try {
+      const { data, error } = await supabase
+        .from('threat_doctor_conversations')
+        .select('*')
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+      setConversations(data || []);
+    } catch (error) {
+      console.error('Failed to load conversations:', error);
+    } finally {
+      setIsLoadingConversations(false);
+    }
+  };
+
+  const loadConversation = async (conversationId: string) => {
+    if (!user) return;
+
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('threat_doctor_messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      const loadedMessages: Message[] = (data || []).map((m) => ({
+        id: m.id,
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+        timestamp: new Date(m.created_at),
+      }));
+
+      setMessages(loadedMessages);
+      setCurrentConversationId(conversationId);
+    } catch (error) {
+      console.error('Failed to load conversation:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load conversation',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const createConversation = async (firstMessage: string): Promise<string | null> => {
+    if (!user) return null;
+
+    try {
+      // Generate title from first message (truncate if too long)
+      const title = firstMessage.length > 50 
+        ? firstMessage.substring(0, 47) + '...' 
+        : firstMessage;
+
+      const { data, error } = await supabase
+        .from('threat_doctor_conversations')
+        .insert({ user_id: user.id, title })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setConversations(prev => [data, ...prev]);
+      setCurrentConversationId(data.id);
+      return data.id;
+    } catch (error) {
+      console.error('Failed to create conversation:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create conversation',
+        variant: 'destructive',
+      });
+      return null;
+    }
+  };
+
+  const saveMessage = async (conversationId: string, role: 'user' | 'assistant', content: string) => {
+    if (!user) return;
+
+    try {
+      await supabase
+        .from('threat_doctor_messages')
+        .insert({
+          conversation_id: conversationId,
+          role,
+          content,
+        });
+
+      // Update conversation's updated_at
+      await supabase
+        .from('threat_doctor_conversations')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', conversationId);
+    } catch (error) {
+      console.error('Failed to save message:', error);
+    }
+  };
 
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() || isLoading) return;
@@ -27,6 +158,18 @@ export function useThreatDoctorChat() {
 
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
+
+    let conversationId = currentConversationId;
+
+    // Create new conversation if needed
+    if (!conversationId && user) {
+      conversationId = await createConversation(content.trim());
+    }
+
+    // Save user message to DB
+    if (conversationId) {
+      await saveMessage(conversationId, 'user', content.trim());
+    }
 
     let assistantContent = '';
 
@@ -58,7 +201,7 @@ export function useThreatDoctorChat() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imljbm5xaWxtd3l0dmlxeGJ5YnpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1MDE5MjksImV4cCI6MjA4MjA3NzkyOX0.7Uo5RhmOZA1paB9VdldfwQ-hBhC9xnD2T8cdRQOnJwU`,
         },
         body: JSON.stringify({ messages: apiMessages }),
       });
@@ -121,6 +264,11 @@ export function useThreatDoctorChat() {
           } catch { /* ignore */ }
         }
       }
+
+      // Save assistant message to DB
+      if (conversationId && assistantContent) {
+        await saveMessage(conversationId, 'assistant', assistantContent);
+      }
     } catch (error) {
       console.error('ThreatDoctor chat error:', error);
       toast({
@@ -133,16 +281,61 @@ export function useThreatDoctorChat() {
     } finally {
       setIsLoading(false);
     }
-  }, [messages, isLoading, toast]);
+  }, [messages, isLoading, toast, currentConversationId, user]);
+
+  const deleteConversation = async (conversationId: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('threat_doctor_conversations')
+        .delete()
+        .eq('id', conversationId);
+
+      if (error) throw error;
+
+      setConversations(prev => prev.filter(c => c.id !== conversationId));
+      
+      if (currentConversationId === conversationId) {
+        setCurrentConversationId(null);
+        setMessages([]);
+      }
+
+      toast({
+        title: 'Conversation deleted',
+        description: 'The conversation has been removed.',
+      });
+    } catch (error) {
+      console.error('Failed to delete conversation:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete conversation',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const startNewChat = useCallback(() => {
+    setCurrentConversationId(null);
+    setMessages([]);
+  }, []);
 
   const clearChat = useCallback(() => {
     setMessages([]);
+    setCurrentConversationId(null);
   }, []);
 
   return {
     messages,
+    conversations,
+    currentConversationId,
     isLoading,
+    isLoadingConversations,
     sendMessage,
     clearChat,
+    startNewChat,
+    loadConversation,
+    deleteConversation,
+    loadConversations,
   };
 }
