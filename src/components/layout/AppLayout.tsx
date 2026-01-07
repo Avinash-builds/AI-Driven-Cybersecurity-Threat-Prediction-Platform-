@@ -15,7 +15,7 @@ import {
 import {
   Shield, LayoutDashboard, FileSearch, Globe, Zap, QrCode, FileCode,
   Map, Globe2, BarChart3, Database, ShieldOff, Brain, AlertTriangle,
-  Settings, Users, LogOut, Menu, X, ChevronDown, Cloud
+  Settings, Users, LogOut, Menu, X, ChevronDown, Cloud, Bot
 } from 'lucide-react';
 
 const navigation = [
@@ -45,6 +45,7 @@ const navigation = [
     name: 'AI',
     icon: Brain,
     children: [
+      { name: 'ThreatDoctor', href: '/ai/threat-doctor', icon: Bot },
       { name: 'Predictions', href: '/ai/predictions', icon: Brain },
     ],
   },
