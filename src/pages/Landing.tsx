@@ -189,7 +189,7 @@ export default function Landing() {
               <span className="font-bold">ThreatPredict</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              © 2024 ThreatPredict. All rights reserved.
+              © {new Date().getFullYear()} ThreatPredict. All rights reserved.
             </p>
           </div>
         </div>
