@@ -64,80 +64,203 @@ function validateUrl(urlString: string): { valid: boolean; error?: string; url?:
   return { valid: true, url };
 }
 
+function generateFallbackAnalysis(url: string, isHttps: boolean, headers: Record<string, string>, responseTime: number): any {
+  const hasSecurityHeaders = {
+    'X-Frame-Options': !!headers['x-frame-options'],
+    'X-Content-Type-Options': !!headers['x-content-type-options'],
+    'Strict-Transport-Security': !!headers['strict-transport-security'],
+    'Content-Security-Policy': !!headers['content-security-policy'],
+    'X-XSS-Protection': !!headers['x-xss-protection'],
+    'Referrer-Policy': !!headers['referrer-policy'],
+    'Permissions-Policy': !!headers['permissions-policy'],
+  };
+
+  const missingHeaders = Object.entries(hasSecurityHeaders).filter(([_, present]) => !present);
+  const headerScore = Object.values(hasSecurityHeaders).filter(Boolean).length;
+  
+  let riskScore = 25; // Base score
+  if (!isHttps) riskScore += 30;
+  riskScore += (7 - headerScore) * 5; // Add points for missing headers
+  riskScore = Math.min(100, riskScore);
+
+  const vulnerabilities = [];
+  
+  if (!isHttps) {
+    vulnerabilities.push({
+      name: 'Insecure HTTP Connection',
+      severity: 'critical',
+      description: 'Website is not using HTTPS, data is transmitted in plain text',
+      recommendation: 'Implement TLS/SSL certificate and enforce HTTPS',
+      cve_id: null
+    });
+  }
+
+  if (!headers['strict-transport-security']) {
+    vulnerabilities.push({
+      name: 'Missing HSTS Header',
+      severity: 'high',
+      description: 'HTTP Strict Transport Security header is not configured',
+      recommendation: 'Add Strict-Transport-Security header with max-age of at least 31536000',
+      cve_id: null
+    });
+  }
+
+  if (!headers['content-security-policy']) {
+    vulnerabilities.push({
+      name: 'Missing Content Security Policy',
+      severity: 'medium',
+      description: 'No Content-Security-Policy header to prevent XSS attacks',
+      recommendation: 'Implement a strict Content-Security-Policy header',
+      cve_id: null
+    });
+  }
+
+  if (!headers['x-frame-options']) {
+    vulnerabilities.push({
+      name: 'Clickjacking Vulnerability',
+      severity: 'medium',
+      description: 'Missing X-Frame-Options header allows clickjacking attacks',
+      recommendation: 'Add X-Frame-Options: DENY or SAMEORIGIN header',
+      cve_id: null
+    });
+  }
+
+  if (!headers['x-content-type-options']) {
+    vulnerabilities.push({
+      name: 'MIME Type Sniffing',
+      severity: 'low',
+      description: 'Browser may interpret files as different MIME types',
+      recommendation: 'Add X-Content-Type-Options: nosniff header',
+      cve_id: null
+    });
+  }
+
+  return {
+    risk_score: riskScore,
+    total_vulnerabilities: vulnerabilities.length,
+    owasp_compliance: {
+      "A01:2021-Broken Access Control": "WARN",
+      "A02:2021-Cryptographic Failures": isHttps ? "PASS" : "FAIL",
+      "A03:2021-Injection": "WARN",
+      "A04:2021-Insecure Design": "WARN",
+      "A05:2021-Security Misconfiguration": headerScore >= 5 ? "PASS" : headerScore >= 3 ? "WARN" : "FAIL",
+      "A06:2021-Vulnerable Components": "WARN",
+      "A07:2021-Auth Failures": "WARN",
+      "A08:2021-Software Integrity": headers['content-security-policy'] ? "PASS" : "WARN",
+      "A09:2021-Logging Failures": "WARN",
+      "A10:2021-SSRF": "PASS"
+    },
+    vulnerabilities,
+    security_headers: hasSecurityHeaders,
+    ssl_info: {
+      grade: isHttps ? (headers['strict-transport-security'] ? "A" : "B") : "F",
+      protocol: isHttps ? "TLS 1.2/1.3" : "None",
+      issuer: isHttps ? "Unknown CA" : "N/A",
+      expires: isHttps ? "Unknown" : "N/A"
+    },
+    response_time_ms: responseTime
+  };
+}
+
 async function analyzeWithGemini(url: string, scanData: any): Promise<any> {
+  if (!GEMINI_API_KEY) {
+    console.log('No Gemini API key, using fallback analysis');
+    return null;
+  }
+
   const prompt = `You are a cybersecurity expert. Analyze this website scan data and provide a security assessment.
 
 URL: ${url}
 Scan Data: ${JSON.stringify(scanData)}
 
-Provide a JSON response with:
+Provide a JSON response with this exact structure (no markdown, just JSON):
 {
-  "risk_score": (0-100),
-  "total_vulnerabilities": number,
+  "risk_score": <number 0-100>,
+  "total_vulnerabilities": <number>,
   "owasp_compliance": {
-    "A01:2021-Broken Access Control": "PASS|FAIL|WARN",
-    "A02:2021-Cryptographic Failures": "PASS|FAIL|WARN",
-    "A03:2021-Injection": "PASS|FAIL|WARN",
-    "A04:2021-Insecure Design": "PASS|FAIL|WARN",
-    "A05:2021-Security Misconfiguration": "PASS|FAIL|WARN",
-    "A06:2021-Vulnerable Components": "PASS|FAIL|WARN",
-    "A07:2021-Auth Failures": "PASS|FAIL|WARN",
-    "A08:2021-Software Integrity": "PASS|FAIL|WARN",
-    "A09:2021-Logging Failures": "PASS|FAIL|WARN",
-    "A10:2021-SSRF": "PASS|FAIL|WARN"
+    "A01:2021-Broken Access Control": "PASS" | "FAIL" | "WARN",
+    "A02:2021-Cryptographic Failures": "PASS" | "FAIL" | "WARN",
+    "A03:2021-Injection": "PASS" | "FAIL" | "WARN",
+    "A04:2021-Insecure Design": "PASS" | "FAIL" | "WARN",
+    "A05:2021-Security Misconfiguration": "PASS" | "FAIL" | "WARN",
+    "A06:2021-Vulnerable Components": "PASS" | "FAIL" | "WARN",
+    "A07:2021-Auth Failures": "PASS" | "FAIL" | "WARN",
+    "A08:2021-Software Integrity": "PASS" | "FAIL" | "WARN",
+    "A09:2021-Logging Failures": "PASS" | "FAIL" | "WARN",
+    "A10:2021-SSRF": "PASS" | "FAIL" | "WARN"
   },
   "vulnerabilities": [
     {
       "name": "string",
-      "severity": "critical|high|medium|low",
+      "severity": "critical" | "high" | "medium" | "low",
       "description": "string",
       "recommendation": "string",
       "cve_id": "string or null"
     }
   ],
   "security_headers": {
-    "X-Frame-Options": boolean,
-    "X-Content-Type-Options": boolean,
-    "Strict-Transport-Security": boolean,
-    "Content-Security-Policy": boolean,
-    "X-XSS-Protection": boolean,
-    "Referrer-Policy": boolean
+    "X-Frame-Options": true | false,
+    "X-Content-Type-Options": true | false,
+    "Strict-Transport-Security": true | false,
+    "Content-Security-Policy": true | false,
+    "X-XSS-Protection": true | false,
+    "Referrer-Policy": true | false
   },
   "ssl_info": {
-    "grade": "A+|A|B|C|D|F",
+    "grade": "A+" | "A" | "B" | "C" | "D" | "F",
     "protocol": "string",
     "issuer": "string",
     "expires": "string"
   }
 }
 
-Only respond with valid JSON.`;
+Only respond with valid JSON, no other text.`;
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            temperature: 0.3,
+            temperature: 0.2,
             maxOutputTokens: 2048,
           },
         }),
       }
     );
 
-    const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-    
-    // Extract JSON from response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+    if (!response.ok) {
+      console.error('Gemini API error:', response.status, await response.text());
+      return null;
     }
-    throw new Error('Invalid JSON response from Gemini');
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!text) {
+      console.error('No text in Gemini response');
+      return null;
+    }
+    
+    // Extract JSON from response (handle markdown code blocks)
+    let jsonStr = text;
+    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) {
+      jsonStr = jsonMatch[1].trim();
+    } else {
+      // Try to find raw JSON
+      const rawMatch = text.match(/\{[\s\S]*\}/);
+      if (rawMatch) {
+        jsonStr = rawMatch[0];
+      }
+    }
+    
+    const parsed = JSON.parse(jsonStr);
+    console.log('Gemini analysis successful');
+    return parsed;
   } catch (error) {
     console.error('Gemini analysis error:', error);
     return null;
@@ -229,17 +352,17 @@ serve(async (req) => {
       );
     }
 
-    // Basic website analysis (simulated initial data for AI)
+    // Basic website analysis
     const startTime = Date.now();
     
-    let fetchResponse;
     let headers: Record<string, string> = {};
-    let isHttps = url.startsWith('https');
+    const isHttps = url.startsWith('https');
     
     try {
-      fetchResponse = await fetch(url, { 
+      const fetchResponse = await fetch(url, { 
         method: 'HEAD',
         redirect: 'follow',
+        signal: AbortSignal.timeout(10000), // 10 second timeout
       });
       fetchResponse.headers.forEach((value, key) => {
         headers[key.toLowerCase()] = value;
@@ -248,64 +371,29 @@ serve(async (req) => {
       console.log('Could not fetch URL directly:', e);
     }
 
+    const responseTime = Date.now() - startTime;
+
     const scanData = {
       url,
       isHttps,
       headers,
-      responseTime: Date.now() - startTime,
+      responseTime,
       timestamp: new Date().toISOString()
     };
 
-    // Use Gemini for comprehensive analysis
+    // Use Gemini for comprehensive analysis, with fallback
     let analysisResult = await analyzeWithGemini(url, scanData);
     
     if (!analysisResult) {
-      // Fallback analysis if Gemini fails
-      analysisResult = {
-        risk_score: isHttps ? 35 : 75,
-        total_vulnerabilities: isHttps ? 2 : 5,
-        scan_duration: `${((Date.now() - startTime) / 1000).toFixed(1)}s`,
-        owasp_compliance: {
-          "A01:2021-Broken Access Control": "WARN",
-          "A02:2021-Cryptographic Failures": isHttps ? "PASS" : "FAIL",
-          "A03:2021-Injection": "WARN",
-          "A04:2021-Insecure Design": "WARN",
-          "A05:2021-Security Misconfiguration": headers['x-frame-options'] ? "PASS" : "FAIL",
-          "A06:2021-Vulnerable Components": "WARN",
-          "A07:2021-Auth Failures": "WARN",
-          "A08:2021-Software Integrity": "WARN",
-          "A09:2021-Logging Failures": "WARN",
-          "A10:2021-SSRF": "PASS"
-        },
-        vulnerabilities: [
-          {
-            name: "Missing Security Headers",
-            severity: "medium",
-            description: "Some recommended security headers are not present",
-            recommendation: "Add X-Frame-Options, CSP, and other security headers"
-          }
-        ],
-        security_headers: {
-          "X-Frame-Options": !!headers['x-frame-options'],
-          "X-Content-Type-Options": !!headers['x-content-type-options'],
-          "Strict-Transport-Security": !!headers['strict-transport-security'],
-          "Content-Security-Policy": !!headers['content-security-policy'],
-          "X-XSS-Protection": !!headers['x-xss-protection'],
-          "Referrer-Policy": !!headers['referrer-policy']
-        },
-        ssl_info: {
-          grade: isHttps ? "A" : "F",
-          protocol: isHttps ? "TLS 1.3" : "None",
-          issuer: isHttps ? "Let's Encrypt" : "N/A",
-          expires: isHttps ? "2025-12-31" : "N/A"
-        }
-      };
+      console.log('Using fallback analysis');
+      analysisResult = generateFallbackAnalysis(url, isHttps, headers, responseTime);
     }
 
+    // Add scan duration
     analysisResult.scan_duration = `${((Date.now() - startTime) / 1000).toFixed(1)}s`;
 
     // Store scan result with user ID
-    await supabase.from('scan_results').insert({
+    const { error: insertError } = await supabase.from('scan_results').insert({
       scan_type: 'website',
       target: url,
       status: 'completed',
@@ -315,6 +403,10 @@ serve(async (req) => {
       completed_at: new Date().toISOString(),
       created_by: user.id
     });
+
+    if (insertError) {
+      console.error('Failed to store scan result:', insertError);
+    }
 
     // If threats found, create threat record
     if (analysisResult.total_vulnerabilities > 0) {
