@@ -10,8 +10,6 @@
 
 **AI-Powered Cybersecurity Intelligence Platform**
 
-[Live Demo](https://threat-predict.lovable.app) · [Report Bug](../../issues) · [Request Feature](../../issues)
-
 </div>
 
 ---
