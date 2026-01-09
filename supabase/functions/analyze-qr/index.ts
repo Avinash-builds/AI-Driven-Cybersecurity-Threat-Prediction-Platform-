@@ -98,9 +98,8 @@ Consider these threat indicators:
 Only respond with valid JSON.`;
 
   try {
-    console.log('Calling Gemini API with model gemini-2.5-flash-preview-05-20');
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -108,27 +107,20 @@ Only respond with valid JSON.`;
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.2,
-            maxOutputTokens: 4096,
+            maxOutputTokens: 1024,
           },
         }),
       }
     );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Gemini API error:', response.status, errorText);
-      throw new Error(`Gemini API error: ${response.status}`);
-    }
-
     const data = await response.json();
-    console.log('Gemini response received');
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
     
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]);
     }
-    throw new Error('Invalid JSON response from Gemini');
+    throw new Error('Invalid JSON response');
   } catch (error) {
     console.error('Gemini analysis error:', error);
     return null;
